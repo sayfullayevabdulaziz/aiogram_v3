@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from tgbot.config import DbConfig
+from tgbot.config import Config
 
 
-def create_engine(db: DbConfig, echo=False):
+def create_engine(db_config: Config, echo=False):
     engine = create_async_engine(
-        db.construct_sqlalchemy_url(),
+        db_config.POSTGRES_DSN,
         query_cache_size=1200,
         pool_size=20,
         max_overflow=200,

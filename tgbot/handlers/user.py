@@ -1,5 +1,3 @@
-from typing import Dict
-
 from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
@@ -33,7 +31,7 @@ async def user_save_from_fab(query: CallbackQuery, callback_data: LanguageCallba
     language_code = callback_data.language_code
     user = await repo.user.get_by_where(User.user_id == query.from_user.id)
     if user is None:
-        new_user = await repo.user.new(
+        await repo.user.new(
             user_id=query.from_user.id,
             language=language_code,
             username=query.from_user.username,
@@ -46,5 +44,5 @@ async def user_save_from_fab(query: CallbackQuery, callback_data: LanguageCallba
             language=language_code
         )
     await query.message.edit_text(
-        text=_('Asosiy menu')
+        text=_('Asosiy menu', locale=language_code)
     )

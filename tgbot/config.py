@@ -1,93 +1,41 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
+from functools import lru_cache
 from typing import Optional
-from environs import Env
 
-from sqlalchemy.engine.url import URL
-
-
-@dataclass
-class DbConfig:
-    host: str
-    password: str
-    user: str
-    database: str
-    port: int = 5432
-
-    # For SQLAlchemy
-    def construct_sqlalchemy_url(self, driver="asyncpg", host=None, port=None) -> str:
-        # TODO: If you're using SQLAlchemy, move the import to the top of the file!
-
-        if not host:
-            host = self.host
-        if not port:
-            port = self.port
-        uri = URL.create(
-            drivername=f"postgresql+{driver}",
-            username=self.user,
-            password=self.password,
-            host=host,
-            port=port,
-            database=self.database,
-        )
-        return uri.render_as_string(hide_password=False)
+from pydantic import PostgresDsn, RedisDsn, field_validator
+from pydantic_core import MultiHostUrl
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-@dataclass
-class TgBot:
-    token: str
-    admin_ids: list[int]
-    use_redis: bool
+class Config(BaseSettings):
+    model_config = SettingsConfigDict(env_file='.env')
+
+    # Bot config
+    BOT_TOKEN: str
+    ADMINS: list[int]
+    USE_REDIS: bool
+    POSTGRES_DSN: PostgresDsn
+
+    @field_validator("POSTGRES_DSN", mode="after")
+    def to_str(cls, v: str | MultiHostUrl) -> str:
+        if isinstance(v, MultiHostUrl):
+            return v.__str__()
+        return v
+
+    # Docker config
+    BOT_CONTAINER_NAME: Optional[str]
+    BOT_IMAGE_NAME: Optional[str]
+    BOT_NAME: Optional[str]
+    PG_CONTAINER_NAME: Optional[str]
+
+    # Redis config
+    REDIS_DSN: Optional[RedisDsn]
 
 
-@dataclass
-class RedisConfig:
-    redis_pass: Optional[str]
-    redis_port: Optional[int]
-    redis_host: Optional[str]
-
-    def dsn(self) -> str:
-        if self.redis_pass:
-            return f"redis://:{self.redis_pass}@{self.redis_host}:{self.redis_port}/0"
-        else:
-            return f"redis://{self.redis_host}:{self.redis_port}/0"
+@lru_cache()
+def get_config():
+    return Config()
 
 
-@dataclass
-class Miscellaneous:
-    other_params: str = None
-
-
-@dataclass
-class Config:
-    tg_bot: TgBot
-    misc: Miscellaneous
-    db: DbConfig
-    redis: RedisConfig = None
-
-
-def load_config(path: str = None) -> Config:
-    env = Env()
-    env.read_env(path)
-
-    return Config(
-        tg_bot=TgBot(
-            token=env.str("BOT_TOKEN"),
-            admin_ids=list(map(int, env.list("ADMINS"))),
-            use_redis=env.bool("USE_REDIS")
-        ),
-
-        db=DbConfig(
-            host=env.str('DB_HOST'),
-            password=env.str('POSTGRES_PASSWORD'),
-            user=env.str('POSTGRES_USER'),
-            database=env.str('POSTGRES_DB'),
-        ),
-
-        # redis=RedisConfig(
-        #     redis_pass=env.str("REDIS_PASSWORD"),
-        #     redis_port=env.int("REDIS_PORT"),
-        #     redis_host=env.str("REDIS_HOST"),
-        # ),
-
-        misc=Miscellaneous()
-    )
+load_config = get_config()
